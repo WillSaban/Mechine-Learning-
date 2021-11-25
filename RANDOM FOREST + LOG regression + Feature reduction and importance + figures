@@ -1,0 +1,120 @@
+# RANDOM FOREST + LOG regression + Feature reduction and importance + figures
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set(font_scale=1.25)
+#!pip3 install --upgrade pandas
+
+import warnings
+warnings.filterwarnings("ignore")
+
+# Build a classification task using 3 informative features
+df = pd.read_excel(r'****.xlsx', index_col=None) 
+
+from sklearn.preprocessing import OneHotEncoder
+
+df['Group'] =df["group"] 
+#df.columns = ["p" + str(c).zfill(2) for c in df.columns]
+df['Group_int']=df.Group
+df.Group_int.loc[df.Group=='Control'] = 0
+df.Group_int.loc[df.Group=='CD'] = 1
+df.Group_int.loc[df.Group=='PD'] = 2
+
+df["Group_int"]=df["Group_int"].astype(float)
+
+print(type(df['Group_int']))
+
+df['Gender_int']=df.gender
+df.Gender_int.loc[df.gender=='F'] = 1
+df.Gender_int.loc[df.gender=='M'] = 2
+
+df['Adjusted MOCA']=df['MOCA_relative_score(fraction)']*.3
+
+df['Adjusted MOCA'].fillna(value=df['Adjusted MOCA'].mean(), inplace=True)
+df['years_of_education'].fillna(value=df['years_of_education'].mean(), inplace=True)
+
+predictors = [ "Age", "Gender_int", "years_of_education", "Adjusted MOCA" ]
+
+CorrelationMAtrix = [ "Age", "Gender_int", "years_of_education", "Adjusted MOCA", "Group_int" ]
+
+#predictors = [ "No Repetition", "Repetition" ]
+#predictors = [ "No Repetition", "Repetition", "accuracy", "meanRT" , "YoE", "Age" , "MOCA"]
+#predictors = df.columns.difference(["Group", "Subtype", "Participant_Public_ID", "count"  ]).tolist()
+print(predictors)
+
+
+# Correlation between features
+from matplotlib.pyplot import figure
+
+plt.figure(figsize=(9, 9),  dpi=360, facecolor='w', edgecolor='k')
+
+mask = np.triu(np.ones_like(df[CorrelationMAtrix].corr()))
+
+
+sns.heatmap(df[CorrelationMAtrix].corr(), vmin=-1, vmax=1, square=True, lw=0, cmap="Spectral_r", mask=mask,
+            cbar=True, cbar_kws=dict(shrink=0.5, label="Pearson $r$ correlation"))
+
+
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+# Add titles
+plt.xlabel("Feature",fontsize=16)
+plt.ylabel("Feature",fontsize=16)
+plt.legend(fontsize=16)
+plt.savefig('correlationmatirx.png', transparent =True, bbox_inches='tight')
+
+# Default accuracy using a random forest
+from sklearn.ensemble import RandomForestClassifier
+print(type(df_train['Group_int']))
+
+
+rf = RandomForestClassifier(n_estimators=100,  random_state=42, bootstrap=True)
+rf.fit(df_train[predictors], df_train['Group_int'])
+rf.score(df_test[predictors], df_test['Group_int'])
+
+# Feature importance
+importance = pd.Series(rf.feature_importances_, index=predictors).sort_values(ascending=False)
+importance
+
+sns.barplot(x=importance.values, y=importance.index)
+
+
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+# Add titles
+plt.xlabel("Importance",fontsize=16)
+plt.ylabel("Feature",fontsize=16)
+plt.legend(fontsize=16)
+plt.savefig('importance.png', transparent =True, bbox_inches='tight')
+
+
+# LogisticRegression
+from sklearn.linear_model import LogisticRegression
+logisticRegr = LogisticRegression()
+logisticRegr.fit(df_train[predictors], df_train['Group_int'])
+score = logisticRegr.score(df_test[predictors], df_test['Group_int'])
+print(score)
+
+
+df.head(1)
+
+# Split into a training and testing set
+from sklearn.model_selection import train_test_split
+
+
+df_train, df_test =  train_test_split(df, test_size=0.25, random_state=42, shuffle= True, stratify=df['Group'])
+
+#df_train, df_test = np.array_split(df, 2)
+print(len(df_test))
+#f_train, df_test = np.split(df, 2)
+
+df_train.head().round(3)
+
+from collections import Counter, defaultdict
+number_of_elements_per_class=Counter(df['Group'])
+print(number_of_elements_per_class)
+
